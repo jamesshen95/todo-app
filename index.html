@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="待辦清單">
+  <meta name="theme-color" content="#6366f1">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>智慧待辦清單</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --q1: #ef4444;
+      --q2: #f97316;
+      --q3: #3b82f6;
+      --q4: #94a3b8;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --sub: #64748b;
+      --border: #e2e8f0;
+      --radius: 14px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bot: env(safe-area-inset-bottom, 0px);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-bottom: max(var(--safe-bot), 80px);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(248,250,252,0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 50;
+      padding: max(var(--safe-top),44px) 16px 12px;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    h1 { font-size: 22px; font-weight: 700; }
+    h1 span { color: var(--primary); }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .icon-btn {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 50%;
+      width: 36px; height: 36px;
+      font-size: 17px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .icon-btn.active { background: #fef3c7; border-color: #fbbf24; }
+
+    .add-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 38px; height: 38px;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 2px 8px rgba(99,102,241,0.4);
+      transition: transform .15s;
+    }
+    .add-btn:active { transform: scale(0.92); }
+
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+
+    .chip {
+      flex-shrink: 0;
+      padding: 5px 13px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: var(--card);
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--sub);
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+    main { padding: 12px 16px; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .stat-card {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }
+    .stat-num { font-size: 22px; font-weight: 700; color: var(--primary); }
+    .stat-label { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--sub);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin: 18px 0 8px;
+    }
+    .section-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .todo-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 14px 14px 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--q4);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      position: relative;
+      transition: opacity .2s, transform .2s;
+    }
+    .todo-card.done { opacity: 0.45; }
+    .todo-card.done .todo-title { text-decoration: line-through; }
+    .todo-card[data-q="1"] { border-left-color: var(--q1); }
+    .todo-card[data-q="2"] { border-left-color: var(--q2); }
+    .todo-card[data-q="3"] { border-left-color: var(--q3); }
+    .todo-card[data-q="4"] { border-left-color: var(--q4); }
+
+    .card-top { display: flex; align-items: flex-start; gap: 10px; }
+
+    .check-btn {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      margin-top: 1px;
+      transition: all .15s;
+    }
+    .check-btn.checked { background: var(--primary); border-color: var(--primary); }
+    .check-btn.checked::after { content: '✓'; color: #fff; font-size: 12px; font-weight: 700; }
+
+    .card-body { flex: 1; min-width: 0; }
+    .todo-title { font-size: 15px; font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+
+    .card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11.5px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: var(--bg);
+      color: var(--sub);
+      font-weight: 500;
+    }
+    .badge.overdue { background: #fef2f2; color: #ef4444; }
+    .badge.soon { background: #fff7ed; color: #f97316; }
+    .badge.notif-on { background: #f0fdf4; color: #16a34a; }
+
+    .urgency-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    [data-q="1"] .urgency-badge { background:#fef2f2; color: var(--q1); }
+    [data-q="2"] .urgency-badge { background:#fff7ed; color: var(--q2); }
+    [data-q="3"] .urgency-badge { background:#eff6ff; color: var(--q3); }
+    [data-q="4"] .urgency-badge { background:#f8fafc; color: var(--q4); }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--border);
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 6px;
+      transition: color .15s;
+      flex-shrink: 0;
+    }
+    .delete-btn:active { color: #ef4444; }
+
+    /* NOTIFICATION BANNER */
+    .notif-banner {
+      display: none;
+      margin: 0 16px 12px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .notif-banner.show { display: block; }
+    .notif-banner-row { display: flex; gap: 8px; margin-top: 10px; }
+    .notif-accept {
+      flex: 1;
+      background: #fff;
+      color: var(--primary);
+      border: none;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .notif-dismiss {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    /* MODAL */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 92dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 16px 20px max(var(--safe-bot),28px);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(60px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 4px; margin: 0 auto 16px; }
+    .modal h2 { font-size: 18px; margin-bottom: 18px; }
+    .form-group { margin-bottom: 16px; }
+
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 6px; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: inherit;
+      appearance: none;
+      -webkit-appearance: none;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { resize: none; height: 80px; }
+
+    .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .toggle-btn {
+      padding: 10px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      color: var(--sub);
+      transition: all .15s;
+    }
+    .toggle-btn.active { border-color: var(--primary); background: #eef2ff; color: var(--primary); }
+
+    .notif-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg);
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+    }
+    .notif-toggle-label { font-size: 14px; color: var(--text); }
+    .notif-toggle-sub { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+    .switch {
+      position: relative;
+      width: 46px; height: 26px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 26px;
+      cursor: pointer;
+      transition: .2s;
+    }
+    .slider:before {
+      content: '';
+      position: absolute;
+      height: 20px; width: 20px;
+      left: 3px; bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .2s;
+    }
+    input:checked + .slider { background: var(--primary); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background .15s;
+    }
+    .submit-btn:active { background: var(--primary-dark); }
+
+    .empty { text-align: center; padding: 48px 24px; color: var(--sub); font-size: 14px; }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* INSTALL GUIDE */
+    .install-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .install-overlay.open { display: flex; }
+    .install-modal {
+      background: var(--card);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      padding: 20px 24px max(var(--safe-bot),32px);
+      animation: slideUp .25s ease;
+    }
+    .install-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .install-step:last-of-type { border-bottom: none; }
+    .step-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .step-text { font-size: 14px; line-height: 1.5; }
+    .step-text strong { display: block; margin-bottom: 2px; }
+    .close-install {
+      width: 100%;
+      padding: 13px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1>待辦 <span>清單</span></h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="notif-status-btn" onclick="toggleNotifStatus()" title="通知狀態">🔔</button>
+      <button class="icon-btn" onclick="openInstallGuide()" title="加入主畫面">📱</button>
+      <button class="add-btn" onclick="openModal()" aria-label="新增">+</button>
+    </div>
+  </div>
+  <div class="filter-row">
+    <button class="chip active" onclick="setFilter('all',this)">全部</button>
+    <button class="chip" onclick="setFilter('q1',this)">🔴 立即處理</button>
+    <button class="chip" onclick="setFilter('q2',this)">🟠 計劃完成</button>
+    <button class="chip" onclick="setFilter('q3',this)">🔵 委派他人</button>
+    <button class="chip" onclick="setFilter('q4',this)">⚪ 可以暫緩</button>
+    <button class="chip" onclick="setFilter('done',this)">✅ 已完成</button>
+  </div>
+</header>
+
+<div class="notif-banner" id="notif-banner">
+  🔔 <strong>開啟提醒通知</strong><br>
+  讓我們在截止日前一天通知你，不錯過任何重要事項！
+  <div class="notif-banner-row">
+    <button class="notif-accept" onclick="requestNotifPermission()">開啟通知</button>
+    <button class="notif-dismiss" onclick="dismissNotifBanner()">稍後再說</button>
+  </div>
+</div>
+
+<main>
+  <div class="stats-row" id="stats"></div>
+  <div id="list"></div>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="modal-title">新增待辦事項</h2>
+
+    <div class="form-group">
+      <label>標題 *</label>
+      <input type="text" id="f-title" placeholder="輸入待辦事項…" maxlength="60">
+    </div>
+
+    <div class="form-group">
+      <label>科目 / 主題</label>
+      <input type="text" id="f-subject" placeholder="例如：數學、英文、專案…" maxlength="30">
+    </div>
+
+    <div class="form-group">
+      <label>分類</label>
+      <select id="f-cat">
+        <option value="學業">📚 學業</option>
+        <option value="家庭">🏠 家庭</option>
+        <option value="工作">💼 工作</option>
+        <option value="健康">💪 健康</option>
+        <option value="財務">💰 財務</option>
+        <option value="社交">👥 社交</option>
+        <option value="其他">📌 其他</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>截止日期</label>
+      <input type="date" id="f-due">
+    </div>
+
+    <div class="form-group">
+      <label>備註</label>
+      <textarea id="f-note" placeholder="額外說明…"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>重要程度</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="imp-yes" onclick="setImportant(true)">⭐ 重要</button>
+        <button class="toggle-btn" id="imp-no" onclick="setImportant(false)">不重要</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>緊急程度</label>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="urg-yes" onclick="setUrgent(true)">🔥 緊急</button>
+        <button class="toggle-btn" id="urg-no" onclick="setUrgent(false)">不緊急</button>
+      </div>
+    </div>
+
+    <div class="form-group" id="notif-form-group">
+      <label>提醒通知</label>
+      <div class="notif-toggle">
+        <div>
+          <div class="notif-toggle-label">截止前一天提醒</div>
+          <div class="notif-toggle-sub" id="notif-toggle-sub">開啟後會在截止日前一天通知</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="f-notif" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="saveItem()">儲存</button>
+  </div>
+</div>
+
+<!-- Install Guide Modal -->
+<div class="install-overlay" id="install-overlay" onclick="closeInstallOutside(event)">
+  <div class="install-modal">
+    <div class="modal-handle"></div>
+    <h2 style="margin-bottom:4px">📱 加入 iOS 主畫面</h2>
+    <p style="font-size:13px;color:var(--sub);margin-bottom:16px">用 Safari 開啟後，按照以下步驟操作</p>
+
+    <div class="install-step">
+      <div class="step-num">1</div>
+      <div class="step-text">
+        <strong>點擊底部分享按鈕</strong>
+        點 Safari 底部工具列的 <strong>分享</strong> 圖示（方框加箭頭 ⬆）
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">2</div>
+      <div class="step-text">
+        <strong>選擇「加入主畫面」</strong>
+        在選單中向下滑，點選「<strong>加入主畫面</strong>」
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">3</div>
+      <div class="step-text">
+        <strong>確認名稱並加入</strong>
+        名稱可修改，然後點右上角「<strong>加入</strong>」
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">4</div>
+      <div class="step-text">
+        <strong>開啟通知（選用）</strong>
+        iOS 16.4+ 在加入主畫面後，可在 App 內開啟提醒通知功能
+      </div>
+    </div>
+
+    <button class="close-install" onclick="closeInstallGuide()">了解，關閉</button>
+  </div>
+</div>
+
+<script>
+  const CATS = { 學業:'📚', 家庭:'🏠', 工作:'💼', 健康:'💪', 財務:'💰', 社交:'👥', 其他:'📌' };
+  const Q_LABELS = { 1:'🔴 立即處理', 2:'🟠 計劃完成', 3:'🔵 委派他人', 4:'⚪ 可以暫緩' };
+
+  let todos = JSON.parse(localStorage.getItem('todos') || '[]');
+  let currentFilter = 'all';
+  let isImportant = true;
+  let isUrgent = true;
+  let editId = null;
+  let notifPermission = Notification?.permission || 'default';
+
+  function save() { localStorage.setItem('todos', JSON.stringify(todos)); }
+
+  function quadrant(imp, urg) {
+    if (imp && urg) return 1;
+    if (imp && !urg) return 2;
+    if (!imp && urg) return 3;
+    return 4;
+  }
+
+  // ── Notifications ──────────────────────────────────────────
+
+  function updateNotifBtn() {
+    const btn = document.getElementById('notif-status-btn');
+    if (!('Notification' in window)) {
+      btn.textContent = '🔕';
+      btn.title = '此裝置不支援通知';
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      btn.textContent = '🔔';
+      btn.classList.add('active');
+      btn.title = '通知已開啟';
+    } else if (Notification.permission === 'denied') {
+      btn.textContent = '🔕';
+      btn.classList.remove('active');
+      btn.title = '通知已封鎖（請至設定開啟）';
+    } else {
+      btn.textContent = '🔔';
+      btn.classList.remove('active');
+      btn.title = '點擊開啟通知';
+    }
+  }
+
+  function toggleNotifStatus() {
+    if (!('Notification' in window)) {
+      alert('此裝置不支援推播通知。\n\n💡 提示：請先在 iOS Safari 中「加入主畫面」，再從主畫面開啟 App，iOS 16.4+ 才支援通知功能。');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      alert('🔔 通知已開啟！\n\n有截止日期的待辦事項，會在截止前一天早上 9 點提醒你。');
+    } else if (Notification.permission === 'denied') {
+      alert('通知已被封鎖。\n請前往：設定 > Safari > 通知，或在主畫面 App 的設定中允許通知。');
+    } else {
+      requestNotifPermission();
+    }
+  }
+
+  async function requestNotifPermission() {
+    dismissNotifBanner();
+    if (!('Notification' in window)) {
+      alert('此裝置或瀏覽器不支援通知。請先「加入主畫面」後再試。');
+      return;
+    }
+    const result = await Notification.requestPermission();
+    notifPermission = result;
+    updateNotifBtn();
+    if (result === 'granted') {
+      scheduleAllNotifications();
+      new Notification('待辦清單', {
+        body: '🎉 通知已開啟！截止日前一天會提醒你。',
+        icon: 'icon-192.png'
+      });
+    }
+  }
+
+  function dismissNotifBanner() {
+    document.getElementById('notif-banner').classList.remove('show');
+    localStorage.setItem('notif-banner-dismissed', '1');
+  }
+
+  function checkShowNotifBanner() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'default') return;
+    if (localStorage.getItem('notif-banner-dismissed')) return;
+    if (todos.filter(t => !t.done && t.due).length === 0) return;
+    setTimeout(() => document.getElementById('notif-banner').classList.add('show'), 1500);
+  }
+
+  function scheduleAllNotifications() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const now = new Date();
+    todos.filter(t => !t.done && t.due && t.notif !== false).forEach(t => {
+      const dueDate = new Date(t.due + 'T09:00:00');
+      const notifDate = new Date(dueDate.getTime() - 86400000); // 1 day before
+      const delay = notifDate.getTime() - now.getTime();
+      if (delay > 0 && delay < 7 * 24 * 3600 * 1000) {
+        setTimeout(() => {
+          if (Notification.permission === 'granted') {
+            new Notification(`⏰ 明天截止：${t.title}`, {
+              body: `分類：${t.cat}${t.subject ? ' ｜ ' + t.subject : ''}\n截止日：${t.due}`,
+              icon: 'icon-192.png',
+              tag: t.id
+            });
+          }
+        }, delay);
+      }
+    });
+  }
+
+  // ── Modal ──────────────────────────────────────────────────
+
+  function setImportant(v) {
+    isImportant = v;
+    document.getElementById('imp-yes').classList.toggle('active', v);
+    document.getElementById('imp-no').classList.toggle('active', !v);
+  }
+
+  function setUrgent(v) {
+    isUrgent = v;
+    document.getElementById('urg-yes').classList.toggle('active', v);
+    document.getElementById('urg-no').classList.toggle('active', !v);
+  }
+
+  function openModal(id = null) {
+    editId = id;
+    document.getElementById('modal-title').textContent = id ? '編輯待辦事項' : '新增待辦事項';
+
+    const notifAvail = 'Notification' in window && Notification.permission === 'granted';
+    document.getElementById('notif-form-group').style.display = notifAvail ? 'block' : 'none';
+
+    if (id) {
+      const t = todos.find(x => x.id === id);
+      document.getElementById('f-title').value = t.title;
+      document.getElementById('f-subject').value = t.subject || '';
+      document.getElementById('f-cat').value = t.cat;
+      document.getElementById('f-due').value = t.due || '';
+      document.getElementById('f-note').value = t.note || '';
+      document.getElementById('f-notif').checked = t.notif !== false;
+      setImportant(t.important);
+      setUrgent(t.urgent);
+    } else {
+      document.getElementById('f-title').value = '';
+      document.getElementById('f-subject').value = '';
+      document.getElementById('f-cat').value = '學業';
+      document.getElementById('f-due').value = '';
+      document.getElementById('f-note').value = '';
+      document.getElementById('f-notif').checked = true;
+      setImportant(true);
+      setUrgent(true);
+    }
+    document.getElementById('overlay').classList.add('open');
+    setTimeout(() => document.getElementById('f-title').focus(), 300);
+  }
+
+  function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+  function closeModalOutside(e) { if (e.target === document.getElementById('overlay')) closeModal(); }
+
+  function saveItem() {
+    const title = document.getElementById('f-title').value.trim();
+    if (!title) { document.getElementById('f-title').focus(); return; }
+    const item = {
+      id: editId || Date.now().toString(),
+      title,
+      subject: document.getElementById('f-subject').value.trim(),
+      cat: document.getElementById('f-cat').value,
+      due: document.getElementById('f-due').value,
+      note: document.getElementById('f-note').value.trim(),
+      important: isImportant,
+      urgent: isUrgent,
+      notif: document.getElementById('f-notif').checked,
+      done: editId ? todos.find(x => x.id === editId).done : false,
+      created: editId ? todos.find(x => x.id === editId).created : Date.now(),
+    };
+    if (editId) {
+      todos = todos.map(x => x.id === editId ? item : x);
+    } else {
+      todos.unshift(item);
+    }
+    save();
+    render();
+    closeModal();
+    scheduleAllNotifications();
+    checkShowNotifBanner();
+  }
+
+  function toggleDone(id) {
+    todos = todos.map(x => x.id === id ? { ...x, done: !x.done } : x);
+    save(); render();
+  }
+
+  function deleteItem(id) {
+    if (!confirm('確定刪除此項目？')) return;
+    todos = todos.filter(x => x.id !== id);
+    save(); render();
+  }
+
+  function setFilter(f, el) {
+    currentFilter = f;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    render();
+  }
+
+  function daysLeft(due) {
+    if (!due) return null;
+    return Math.ceil((new Date(due) - new Date().setHours(0,0,0,0)) / 86400000);
+  }
+
+  function formatDate(due) {
+    if (!due) return '';
+    const [y, m, d] = due.split('-');
+    return `${m}/${d}`;
+  }
+
+  // ── Install Guide ──────────────────────────────────────────
+
+  function openInstallGuide() { document.getElementById('install-overlay').classList.add('open'); }
+  function closeInstallGuide() { document.getElementById('install-overlay').classList.remove('open'); }
+  function closeInstallOutside(e) { if (e.target === document.getElementById('install-overlay')) closeInstallGuide(); }
+
+  // ── Render ─────────────────────────────────────────────────
+
+  function render() {
+    const sorted = [...todos].sort((a, b) => {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      const qa = quadrant(a.important, a.urgent);
+      const qb = quadrant(b.important, b.urgent);
+      if (qa !== qb) return qa - qb;
+      const da = a.due || '9999';
+      const db = b.due || '9999';
+      return da.localeCompare(db);
+    });
+
+    const filtered = currentFilter === 'all'
+      ? sorted.filter(x => !x.done)
+      : currentFilter === 'done'
+      ? sorted.filter(x => x.done)
+      : sorted.filter(x => !x.done && quadrant(x.important, x.urgent) === +currentFilter.replace('q',''));
+
+    const total = todos.filter(x => !x.done).length;
+    const doneCount = todos.filter(x => x.done).length;
+    const overdueCount = todos.filter(x => !x.done && x.due && daysLeft(x.due) < 0).length;
+    document.getElementById('stats').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">待完成</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#ef4444">${overdueCount}</div><div class="stat-label">已逾期</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#22c55e">${doneCount}</div><div class="stat-label">已完成</div></div>
+    `;
+
+    if (filtered.length === 0) {
+      document.getElementById('list').innerHTML = `
+        <div class="empty"><div class="icon">${currentFilter === 'done' ? '📋' : '🎉'}</div>
+        ${currentFilter === 'done' ? '還沒有已完成的項目' : '這裡沒有待辦事項！'}</div>`;
+      return;
+    }
+
+    let html = '';
+    let lastQ = null;
+    const notifOn = 'Notification' in window && Notification.permission === 'granted';
+
+    filtered.forEach(t => {
+      const q = quadrant(t.important, t.urgent);
+      if (!t.done && lastQ !== q && currentFilter === 'all') {
+        lastQ = q;
+        const colors = { 1:'#ef4444', 2:'#f97316', 3:'#3b82f6', 4:'#94a3b8' };
+        html += `<div class="section-label"><span class="section-dot" style="background:${colors[q]}"></span>${Q_LABELS[q]}</div>`;
+      }
+      const days = daysLeft(t.due);
+      let dueBadge = '';
+      if (t.due) {
+        const cls = days < 0 ? 'overdue' : days <= 3 ? 'soon' : '';
+        const label = days < 0 ? `逾期 ${-days} 天` : days === 0 ? '今天截止' : days === 1 ? '明天截止' : `${formatDate(t.due)}（${days}天）`;
+        dueBadge = `<span class="badge ${cls}">📅 ${label}</span>`;
+      }
+      const subBadge = t.subject ? `<span class="badge">📖 ${t.subject}</span>` : '';
+      const catIcon = CATS[t.cat] || '📌';
+      const notifBadge = notifOn && t.notif !== false && t.due ? `<span class="badge notif-on">🔔</span>` : '';
+
+      html += `
+        <div class="todo-card ${t.done ? 'done' : ''}" data-q="${q}" onclick="openModal('${t.id}')">
+          <div class="card-top">
+            <button class="check-btn ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleDone('${t.id}')"></button>
+            <div class="card-body">
+              <div class="todo-title">${t.title}</div>
+              <div class="card-meta">
+                <span class="badge">${catIcon} ${t.cat}</span>
+                ${subBadge}
+                ${dueBadge}
+                ${notifBadge}
+                ${!t.done ? `<span class="urgency-badge">${Q_LABELS[q]}</span>` : ''}
+              </div>
+              ${t.note ? `<div style="font-size:12px;color:var(--sub);margin-top:6px;line-height:1.4">${t.note}</div>` : ''}
+            </div>
+            <button class="delete-btn" onclick="event.stopPropagation();deleteItem('${t.id}')">×</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById('list').innerHTML = html;
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+
+  updateNotifBtn();
+  render();
+  checkShowNotifBanner();
+  scheduleAllNotifications();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
