@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>財務比率報表產生器 - Winning The Games</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Noto Sans TC', Arial, sans-serif; font-size: 13px; background: #f0f0f0; color: #222; }
+
+  /* ── Input Page ── */
+  #input-page { max-width: 960px; margin: 16px auto; background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  #input-page h1 { font-size: 20px; margin-bottom: 8px; color: #1a1a1a; }
+  .section-title { font-size: 14px; font-weight: bold; background: #333; color: #fff; padding: 8px 12px; margin: 18px 0 8px; border-radius: 4px; }
+  .info-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; align-items: center; }
+  .info-row label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .info-row input[type=text] { border: 1px solid #bbb; border-radius: 6px; padding: 8px 10px; width: 130px; font-size: 15px; -webkit-appearance: none; }
+  .info-row input[type=text].wide { width: 180px; }
+
+  /* scrollable wrapper for tables on mobile */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.input-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; min-width: 420px; }
+  table.input-table th { background: #444; color: #fff; padding: 8px 8px; text-align: center; font-size: 13px; font-weight: bold; white-space: nowrap; }
+  table.input-table th.left { text-align: left; }
+  table.input-table td { padding: 2px 4px; border: 1px solid #ddd; vertical-align: middle; }
+  table.input-table td.label-cell { background: #f5f5f5; font-size: 12px; }
+  table.input-table td.group-cell { background: #e0e0e0; font-weight: bold; font-size: 12px; }
+  table.input-table input[type=number] { width: 100%; border: none; background: transparent; text-align: right; font-size: 15px; padding: 6px 4px; outline: none; min-width: 80px; -webkit-appearance: none; }
+  table.input-table input[type=number]:focus { background: #fffbe6; border-radius: 2px; }
+
+  @media (max-width: 600px) {
+    #input-page { margin: 8px; padding: 12px; border-radius: 6px; }
+    #input-page h1 { font-size: 17px; }
+    .section-title { font-size: 13px; }
+    .info-row label { font-size: 13px; }
+    .info-row input[type=text] { font-size: 16px; padding: 8px; width: 110px; }
+    .info-row input[type=text].wide { width: 150px; }
+    table.input-table td.label-cell { font-size: 11px; min-width: 140px; }
+  }
+
+  .hint { font-size: 11px; color: #888; margin: 2px 0 8px; line-height: 1.5; }
+  .btn-generate { display: block; width: 100%; padding: 16px; margin-top: 20px; background: #1a5c2a; color: #fff; border: none; border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer; letter-spacing: 1px; -webkit-tap-highlight-color: transparent; }
+  .btn-generate:active { background: #134520; }
+
+  /* ── Report Page ── */
+  #report-page { display: none; max-width: 1100px; margin: 16px auto; padding: 0 8px; }
+  .report-actions { margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-back { padding: 10px 18px; background: #555; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  .btn-print { padding: 10px 18px; background: #1a5c2a; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  .report-scroll-hint { font-size: 11px; color: #888; margin-bottom: 6px; display: none; }
+  @media (max-width: 700px) { .report-scroll-hint { display: block; } }
+  .report-card-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  .report-card { background: #fff; border: 2px solid #333; padding: 0; margin-bottom: 30px; }
+
+  /* Header */
+  .report-header { display: flex; align-items: stretch; background: #222; color: #fff; }
+  .report-num { font-size: 52px; font-weight: 900; padding: 10px 18px; color: #fff; line-height: 1; display: flex; align-items: center; }
+  .report-logo-area { padding: 8px 14px; display: flex; flex-direction: column; justify-content: center; border-left: 2px solid #555; border-right: 2px solid #555; }
+  .report-logo-text { font-size: 11px; color: #ccc; letter-spacing: 1px; text-transform: uppercase; }
+  .report-logo-big { font-size: 18px; font-weight: 900; color: #fff; line-height: 1; }
+  .report-company-name { padding: 8px 16px; font-size: 18px; font-weight: bold; color: #fff; display: flex; align-items: center; }
+  .report-ifrs { padding: 8px 8px; font-size: 10px; color: #aaa; display: flex; align-items: center; }
+  .report-header-spacer { flex: 1; }
+  .report-header-links { padding: 8px 12px; font-size: 9px; color: #aaa; display: flex; flex-direction: column; justify-content: center; }
+
+  /* Body */
+  .report-body { display: flex; }
+
+  /* Left panel */
+  .left-panel { width: 220px; flex-shrink: 0; border-right: 1px solid #ccc; }
+  .left-panel table { width: 100%; border-collapse: collapse; }
+  .left-panel table th { background: #555; color: #fff; padding: 4px 6px; font-size: 11px; text-align: center; }
+  .left-panel table th.label { text-align: left; }
+  .left-panel table td { padding: 3px 6px; font-size: 11px; border-bottom: 1px solid #ddd; text-align: right; }
+  .left-panel table td.row-label { text-align: left; background: #f5f5f5; white-space: nowrap; font-size: 10.5px; }
+  .left-panel table td.bold-row { font-weight: bold; background: #e8e8e8; }
+
+  /* Right panel (ratio table) */
+  .right-panel { flex: 1; }
+  .right-panel table { width: 100%; border-collapse: collapse; }
+  .right-panel table th { background: #555; color: #fff; padding: 4px 8px; font-size: 11px; text-align: center; white-space: nowrap; }
+  .right-panel table th.ratio-col { width: 52px; }
+  .right-panel table th.label-header { text-align: left; }
+  .right-panel table td { padding: 3px 8px; font-size: 11px; border-bottom: 1px solid #ddd; text-align: right; white-space: nowrap; }
+  .right-panel table td.category { background: #333; color: #fff; font-weight: bold; font-size: 12px; text-align: center; vertical-align: middle; writing-mode: horizontal-tb; padding: 4px; width: 44px; }
+  .right-panel table td.ratio-name { text-align: left; background: #f5f5f5; font-size: 11px; padding-left: 8px; }
+  .right-panel table td.na { color: #aaa; text-align: center; }
+
+  /* Cash flow bottom */
+  .cf-section { border-top: 2px solid #333; }
+  .cf-section table { width: 100%; border-collapse: collapse; }
+  .cf-section table th { background: #555; color: #fff; padding: 4px 8px; font-size: 11px; text-align: center; }
+  .cf-section table th.label-header { text-align: left; }
+  .cf-section table td { padding: 3px 8px; font-size: 11px; border-bottom: 1px solid #ddd; text-align: right; }
+  .cf-section table td.row-label { text-align: left; background: #f5f5f5; white-space: nowrap; font-size: 11px; }
+
+  /* Print */
+  @media print {
+    body { background: #fff; }
+    #input-page { display: none !important; }
+    #report-page { display: block !important; }
+    .btn-back, .btn-print { display: none !important; }
+    .report-card { page-break-after: always; border: 1px solid #333; margin-bottom: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ INPUT PAGE ══════════════════ -->
+<div id="input-page">
+  <h1>財務比率報表產生器</h1>
+  <p class="hint">請輸入財報數字（單位：百萬元），系統將自動計算各項財務比率並生成「Winning The Games」格式報表。</p>
+
+  <div class="section-title">公司基本資訊</div>
+  <div class="info-row">
+    <label>公司代號：<input type="text" id="companyNum" placeholder="例：2330" class="wide"></label>
+    <label>公司名稱：<input type="text" id="companyName" placeholder="例：台積電" class="wide"></label>
+    <label>年度1：<input type="text" id="year1" value="2023"></label>
+    <label>年度2：<input type="text" id="year2" value="2024"></label>
+    <label>年度3：<input type="text" id="year3" value="2025"></label>
+  </div>
+
+  <!-- ── 損益表 ── -->
+  <div class="section-title">損益表 Income Statement（單位：百萬元）</div>
+  <p class="hint">* 請填入「百萬元」單位的數字，例如台積電營收 2,161,636 百萬元就填 2161636。</p>
+  <div class="table-scroll"><table class="input-table">
+    <thead><tr>
+      <th class="left" style="width:260px">項目</th>
+      <th id="th-y1">2023</th><th id="th-y2">2024</th><th id="th-y3">2025</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="label-cell">營業收入 Revenue</td>
+        <td><input type="number" id="rev1" placeholder="0"></td>
+        <td><input type="number" id="rev2" placeholder="0"></td>
+        <td><input type="number" id="rev3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">銷貨成本 COGS</td>
+        <td><input type="number" id="cogs1" placeholder="0"></td>
+        <td><input type="number" id="cogs2" placeholder="0"></td>
+        <td><input type="number" id="cogs3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">營業毛利 Gross Profit（= 收入 - 成本，可留空自動計算）</td>
+        <td><input type="number" id="gp1" placeholder="自動計算"></td>
+        <td><input type="number" id="gp2" placeholder="自動計算"></td>
+        <td><input type="number" id="gp3" placeholder="自動計算"></td></tr>
+      <tr><td class="label-cell">營業利益 Operating Income</td>
+        <td><input type="number" id="oi1" placeholder="0"></td>
+        <td><input type="number" id="oi2" placeholder="0"></td>
+        <td><input type="number" id="oi3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">利息費用 Interest Expense</td>
+        <td><input type="number" id="ie1" placeholder="0"></td>
+        <td><input type="number" id="ie2" placeholder="0"></td>
+        <td><input type="number" id="ie3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">稅前淨利 Pre-tax Income</td>
+        <td><input type="number" id="pti1" placeholder="0"></td>
+        <td><input type="number" id="pti2" placeholder="0"></td>
+        <td><input type="number" id="pti3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">稅後淨利 Net Income</td>
+        <td><input type="number" id="ni1" placeholder="0"></td>
+        <td><input type="number" id="ni2" placeholder="0"></td>
+        <td><input type="number" id="ni3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">每股盈餘 EPS（元）</td>
+        <td><input type="number" id="eps1" placeholder="0"></td>
+        <td><input type="number" id="eps2" placeholder="0"></td>
+        <td><input type="number" id="eps3" placeholder="0"></td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ── 資產負債表 ── -->
+  <div class="section-title">資產負債表 Balance Sheet（單位：百萬元，為期末餘額）</div>
+  <p class="hint">* 周轉率計算使用「前後兩年平均」；最早年度若無前期資料，將使用當年底餘額。</p>
+  <div class="table-scroll"><table class="input-table">
+    <thead><tr>
+      <th class="left" style="width:260px">項目</th>
+      <th>前期（Y0，選填）</th>
+      <th id="bs-th-y1">2023</th><th id="bs-th-y2">2024</th><th id="bs-th-y3">2025</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="group-cell" colspan="5">資產 Assets</td></tr>
+      <tr><td class="label-cell">現金與約當現金 Cash &amp; Equivalents</td>
+        <td><input type="number" id="cash0" placeholder="選填"></td>
+        <td><input type="number" id="cash1" placeholder="0"></td>
+        <td><input type="number" id="cash2" placeholder="0"></td>
+        <td><input type="number" id="cash3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">應收帳款淨額 Accounts Receivable</td>
+        <td><input type="number" id="ar0" placeholder="選填"></td>
+        <td><input type="number" id="ar1" placeholder="0"></td>
+        <td><input type="number" id="ar2" placeholder="0"></td>
+        <td><input type="number" id="ar3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">存貨 Inventory</td>
+        <td><input type="number" id="inv0" placeholder="選填"></td>
+        <td><input type="number" id="inv1" placeholder="0"></td>
+        <td><input type="number" id="inv2" placeholder="0"></td>
+        <td><input type="number" id="inv3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">預付款項 Prepaid Expenses（速動比率用）</td>
+        <td></td>
+        <td><input type="number" id="pre1" placeholder="0"></td>
+        <td><input type="number" id="pre2" placeholder="0"></td>
+        <td><input type="number" id="pre3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">流動資產 Current Assets</td>
+        <td></td>
+        <td><input type="number" id="ca1" placeholder="0"></td>
+        <td><input type="number" id="ca2" placeholder="0"></td>
+        <td><input type="number" id="ca3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">不動產廠房設備淨額 PP&amp;E (net)</td>
+        <td><input type="number" id="ppe0" placeholder="選填"></td>
+        <td><input type="number" id="ppe1" placeholder="0"></td>
+        <td><input type="number" id="ppe2" placeholder="0"></td>
+        <td><input type="number" id="ppe3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">總資產 Total Assets</td>
+        <td><input type="number" id="ta0" placeholder="選填"></td>
+        <td><input type="number" id="ta1" placeholder="0"></td>
+        <td><input type="number" id="ta2" placeholder="0"></td>
+        <td><input type="number" id="ta3" placeholder="0"></td></tr>
+      <tr><td class="group-cell" colspan="5">負債 &amp; 股東權益 Liabilities &amp; Equity</td></tr>
+      <tr><td class="label-cell">應付帳款 Accounts Payable</td>
+        <td></td>
+        <td><input type="number" id="ap1" placeholder="0"></td>
+        <td><input type="number" id="ap2" placeholder="0"></td>
+        <td><input type="number" id="ap3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">流動負債 Current Liabilities</td>
+        <td></td>
+        <td><input type="number" id="cl1" placeholder="0"></td>
+        <td><input type="number" id="cl2" placeholder="0"></td>
+        <td><input type="number" id="cl3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">長期負債（非流動負債）Long-term Liabilities</td>
+        <td></td>
+        <td><input type="number" id="ll1" placeholder="0"></td>
+        <td><input type="number" id="ll2" placeholder="0"></td>
+        <td><input type="number" id="ll3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">實收資本額 Paid-in Capital（稅前純益佔資本比率用）</td>
+        <td></td>
+        <td><input type="number" id="pic1" placeholder="0"></td>
+        <td><input type="number" id="pic2" placeholder="0"></td>
+        <td><input type="number" id="pic3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">股東權益 Shareholders' Equity</td>
+        <td><input type="number" id="eq0" placeholder="選填"></td>
+        <td><input type="number" id="eq1" placeholder="0"></td>
+        <td><input type="number" id="eq2" placeholder="0"></td>
+        <td><input type="number" id="eq3" placeholder="0"></td></tr>
+    </tbody>
+  </table></div>
+
+  <!-- ── 現金流量表 ── -->
+  <div class="section-title">現金流量表 Cash Flow Statement（單位：百萬元）</div>
+  <div class="table-scroll"><table class="input-table">
+    <thead><tr>
+      <th class="left" style="width:260px">項目</th>
+      <th id="cf-th-y1">2023</th><th id="cf-th-y2">2024</th><th id="cf-th-y3">2025</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="label-cell">營業活動現金流量 Operating CF</td>
+        <td><input type="number" id="ocf1" placeholder="0"></td>
+        <td><input type="number" id="ocf2" placeholder="0"></td>
+        <td><input type="number" id="ocf3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">投資活動現金流量 Investing CF（通常為負，填負數）</td>
+        <td><input type="number" id="icf1" placeholder="0"></td>
+        <td><input type="number" id="icf2" placeholder="0"></td>
+        <td><input type="number" id="icf3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">籌資活動現金流量 Financing CF（通常為負，填負數）</td>
+        <td><input type="number" id="fcf1" placeholder="0"></td>
+        <td><input type="number" id="fcf2" placeholder="0"></td>
+        <td><input type="number" id="fcf3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">資本支出 Capital Expenditure（正數，現金流量允當比率用）</td>
+        <td><input type="number" id="capex1" placeholder="0"></td>
+        <td><input type="number" id="capex2" placeholder="0"></td>
+        <td><input type="number" id="capex3" placeholder="0"></td></tr>
+      <tr><td class="label-cell">現金股利支付 Cash Dividends Paid（正數）</td>
+        <td><input type="number" id="div1" placeholder="0"></td>
+        <td><input type="number" id="div2" placeholder="0"></td>
+        <td><input type="number" id="div3" placeholder="0"></td></tr>
+    </tbody>
+  </table></div>
+
+  <button class="btn-generate" onclick="generateReport()">生成財務比率報表 →</button>
+</div>
+
+<!-- ══════════════════ REPORT PAGE ══════════════════ -->
+<div id="report-page">
+  <div class="report-actions">
+    <button class="btn-back" onclick="showInput()">← 返回修改</button>
+    <button class="btn-print" onclick="window.print()">列印 / 儲存PDF</button>
+  </div>
+  <p class="report-scroll-hint">← 左右滑動可查看完整報表 →</p>
+  <div class="report-card-wrap">
+    <div id="report-container"></div>
+  </div>
+</div>
+
+<script>
+// ── Helpers ──
+function v(id) {
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  const val = parseFloat(el.value);
+  return isNaN(val) ? 0 : val;
+}
+function avg(a, b) { return b !== null ? (a + b) / 2 : a; }
+function fmt(num, dec) {
+  if (num === null || num === undefined || !isFinite(num) || isNaN(num)) return 'N/A';
+  return num.toFixed(dec === undefined ? 1 : dec);
+}
+function fmtCF(num) {
+  if (num === 0) return '—';
+  const abs = Math.abs(num);
+  const s = abs.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
+  return num < 0 ? `(${s})` : s;
+}
+function pct(a, b) { return (b && b !== 0) ? a / b * 100 : null; }
+
+function showInput() {
+  document.getElementById('input-page').style.display = 'block';
+  document.getElementById('report-page').style.display = 'none';
+}
+
+// ── Update year headers on input page ──
+function syncYearHeaders() {
+  ['y1','y2','y3'].forEach((k,i) => {
+    const yr = document.getElementById('year'+(i+1)).value || (2023+i);
+    const ids = ['th-'+k,'bs-th-'+k,'cf-th-'+k];
+    ids.forEach(id => { const el=document.getElementById(id); if(el) el.textContent=yr; });
+  });
+}
+['year1','year2','year3'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', syncYearHeaders);
+});
+
+// ── Main calculation ──
+function generateReport() {
+  const years = [v('year1')||2023, v('year2')||2024, v('year3')||2025]
+    .map((_,i) => document.getElementById('year'+(i+1)).value || (2023+i));
+
+  // Raw BS data (index 0 = prior year Y0)
+  const raw = [
+    { cash: v('cash0')||null, ar: v('ar0')||null, inv: v('inv0')||null,
+      ppe: v('ppe0')||null, ta: v('ta0')||null, eq: v('eq0')||null },
+  ];
+  for (let i = 1; i <= 3; i++) {
+    raw.push({
+      cash: v('cash'+i), ar: v('ar'+i), inv: v('inv'+i),
+      pre: v('pre'+i), ca: v('ca'+i), ppe: v('ppe'+i),
+      ta: v('ta'+i), ap: v('ap'+i), cl: v('cl'+i),
+      ll: v('ll'+i), pic: v('pic'+i), eq: v('eq'+i),
+      rev: v('rev'+i), cogs: v('cogs'+i),
+      gp: v('gp'+i) || (v('rev'+i) - v('cogs'+i)),
+      oi: v('oi'+i), ie: v('ie'+i), pti: v('pti'+i),
+      ni: v('ni'+i), eps: v('eps'+i),
+      ocf: v('ocf'+i), icf: v('icf'+i), fcf: v('fcf'+i),
+      capex: v('capex'+i), div: v('div'+i),
+    });
+  }
+
+  const companyNum = document.getElementById('companyNum').value || '—';
+  const companyName = document.getElementById('companyName').value || '';
+  const container = document.getElementById('report-container');
+  container.innerHTML = '';
+
+  const cards = [];
+  for (let yi = 1; yi <= 3; yi++) {
+    // Only generate single-card report covering all years
+  }
+  container.innerHTML = buildReportCard(companyNum, companyName, years, raw);
+
+  document.getElementById('input-page').style.display = 'none';
+  document.getElementById('report-page').style.display = 'block';
+}
+
+function calcYear(raw, yi) {
+  const d = raw[yi];      // current year (index yi, 1-based in raw array)
+  const prev = raw[yi-1]; // previous year (may have nulls if Y0 not entered)
+
+  const hasPrev = (field) => prev && prev[field] !== null && prev[field] !== undefined && prev[field] !== 0;
+  const avgField = (f) => hasPrev(f) ? avg(d[f], prev[f]) : d[f];
+
+  // --- 會計項目 (占總資產%) ---
+  const ta = d.ta;
+  const bs = {
+    cash: ta > 0 ? pct(d.cash, ta) : null,
+    ar:   ta > 0 ? pct(d.ar, ta) : null,
+    inv:  ta > 0 ? pct(d.inv, ta) : null,
+    ca:   ta > 0 ? pct(d.ca, ta) : null,
+    ap:   ta > 0 ? pct(d.ap, ta) : null,
+    cl:   ta > 0 ? pct(d.cl, ta) : null,
+    ll:   ta > 0 ? pct(d.ll, ta) : null,
+    eq:   ta > 0 ? pct(d.eq, ta) : null,
+  };
+
+  // --- 財務比率 ---
+  // 財務結構
+  const debtRatio = ta > 0 ? pct(ta - d.eq, ta) : null;
+  const longTermCapRatio = d.ppe > 0 ? pct(d.ll + d.eq, d.ppe) : null;
+
+  // 償債能力
+  const currentRatio = d.cl > 0 ? pct(d.ca, d.cl) : null;
+  const quickRatio = d.cl > 0 ? pct(d.ca - d.inv - d.pre, d.cl) : null;
+
+  // 經營能力
+  const avgAR = avgField('ar');
+  const avgInv = avgField('inv');
+  const avgPPE = avgField('ppe');
+  const avgTA = avgField('ta');
+
+  const arTurnover = (avgAR > 0 && d.rev > 0) ? d.rev / avgAR : null;
+  const avgCollDays = arTurnover ? 365 / arTurnover : null;
+  const invTurnover = (avgInv > 0 && d.cogs > 0) ? d.cogs / avgInv : null;
+  const avgInvDays = invTurnover ? 365 / invTurnover : null;
+  const ppeTurnover = (avgPPE > 0 && d.rev > 0) ? d.rev / avgPPE : null;
+  const taTurnover = (avgTA > 0 && d.rev > 0) ? d.rev / avgTA : null;
+
+  // 獲利能力
+  const avgTAforROA = avgTA > 0 ? avgTA : ta;
+  const avgEq = hasPrev('eq') ? avg(d.eq, prev.eq) : d.eq;
+
+  const roa = avgTAforROA > 0 ? pct(d.ni + d.ie * 0.75, avgTAforROA) : null;
+  const roe = avgEq > 0 ? pct(d.ni, avgEq) : null;
+  const capRatio = d.pic > 0 ? pct(d.pti, d.pic) : null;
+  const grossMargin = d.rev > 0 ? pct(d.gp, d.rev) : null;
+  const opMargin = d.rev > 0 ? pct(d.oi, d.rev) : null;
+  const netMargin = d.rev > 0 ? pct(d.ni, d.rev) : null;
+  const eps = d.eps || null;
+
+  // 現金流量
+  const cfRatio = d.cl > 0 ? pct(d.ocf, d.cl) : null;
+
+  return { bs, debtRatio, longTermCapRatio, currentRatio, quickRatio,
+    arTurnover, avgCollDays, invTurnover, avgInvDays, ppeTurnover, taTurnover,
+    roa, roe, capRatio, grossMargin, opMargin, netMargin, eps,
+    cfRatio,
+    ocf: d.ocf, icf: d.icf, fcf: d.fcf,
+    ta: d.ta, cl: d.cl, ca: d.ca, inv: d.inv, ppe: d.ppe,
+    eq: d.eq, ll: d.ll, ap: d.ap, cash: d.cash, ar: d.ar,
+  };
+}
+
+function buildReportCard(companyNum, companyName, years, raw) {
+  const c = [1,2,3].map(i => calcYear(raw, i));
+
+  function r(vals, dec) {
+    return vals.map(val => {
+      if (val === null || val === undefined || !isFinite(val) || isNaN(val)) return `<td class="na">N/A</td>`;
+      return `<td>${fmt(val, dec)}</td>`;
+    }).join('');
+  }
+  function rCF(vals) {
+    return vals.map(v => `<td style="text-align:right">${fmtCF(v)}</td>`).join('');
+  }
+  function rBS(field, bold) {
+    const cls = bold ? ' class="bold-row"' : '';
+    return c.map(ci => {
+      const val = ci.bs[field];
+      if (val === null || val === undefined || !isFinite(val)) return `<td${cls} class="na">N/A</td>`;
+      return `<td${cls}>${fmt(val,1)}</td>`;
+    }).join('');
+  }
+
+  const yThs = years.map(y => `<th class="ratio-col">${y}</th>`).join('');
+  const yThsBS = years.map(y => `<th style="width:52px">${y}</th>`).join('');
+
+  return `
+<div class="report-card">
+  <!-- Header -->
+  <div class="report-header">
+    <div class="report-num">${companyNum}</div>
+    <div class="report-logo-area">
+      <div class="report-logo-text">Winning</div>
+      <div class="report-logo-big">The<br>GAMES</div>
+    </div>
+    <div class="report-company-name">${companyName}</div>
+    <div class="report-ifrs">IFRS applied</div>
+    <div class="report-header-spacer"></div>
+    <div class="report-header-links">
+      http://mops.twse.com.tw/mops/web/t05st22_q1#<br>
+      https://tw.stock.yahoo.com/d/s/company_0000.html
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="report-body">
+    <!-- Left: 會計項目 -->
+    <div class="left-panel">
+      <table>
+        <thead><tr><th class="label">會計項目 (占總資產%)</th>${yThsBS}</tr></thead>
+        <tbody>
+          <tr><td class="row-label">現金與約當現金 = 貨幣資金</td>${rBS('cash')}</tr>
+          <tr><td class="row-label">應收帳款</td>${rBS('ar')}</tr>
+          <tr><td class="row-label">存貨</td>${rBS('inv')}</tr>
+          <tr><td class="row-label bold-row">流動資產</td>${rBS('ca', true)}</tr>
+          <tr><td class="row-label bold-row">總資產</td>${c.map(ci=>`<td class="bold-row">${ci.bs.ca !== null ? '100' : 'N/A'}</td>`).join('')}</tr>
+          <tr><td class="row-label">應付帳款</td>${rBS('ap')}</tr>
+          <tr><td class="row-label bold-row">流動負債</td>${rBS('cl', true)}</tr>
+          <tr><td class="row-label">長期負債</td>${rBS('ll')}</tr>
+          <tr><td class="row-label bold-row">股東權益</td>${rBS('eq', true)}</tr>
+          <tr><td class="row-label bold-row">總負債+股東權益</td>${c.map(ci=>`<td class="bold-row">${ci.bs.ca !== null ? '100' : 'N/A'}</td>`).join('')}</tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Right: 財務比率 -->
+    <div class="right-panel">
+      <table>
+        <thead><tr>
+          <th style="width:44px">類別</th>
+          <th class="label-header">財務比率</th>
+          ${yThs}
+        </tr></thead>
+        <tbody>
+          <!-- 財務結構 -->
+          <tr>
+            <td class="category" rowspan="2">財務<br>結構</td>
+            <td class="ratio-name">負債占資產比率(%) = 資產負債率</td>
+            ${r([c[0].debtRatio, c[1].debtRatio, c[2].debtRatio])}
+          </tr>
+          <tr>
+            <td class="ratio-name">長期資金占不動產/廠房及設備比率(%)<br>= 長期資產適合率</td>
+            ${r([c[0].longTermCapRatio, c[1].longTermCapRatio, c[2].longTermCapRatio])}
+          </tr>
+          <!-- 償債能力 -->
+          <tr>
+            <td class="category" rowspan="2">償債<br>能力</td>
+            <td class="ratio-name">流動比率(%)</td>
+            ${r([c[0].currentRatio, c[1].currentRatio, c[2].currentRatio])}
+          </tr>
+          <tr>
+            <td class="ratio-name">速動比率(%)</td>
+            ${r([c[0].quickRatio, c[1].quickRatio, c[2].quickRatio])}
+          </tr>
+          <!-- 經營能力 -->
+          <tr>
+            <td class="category" rowspan="6">經營<br>能力</td>
+            <td class="ratio-name">應收款項周轉率(次)</td>
+            ${r([c[0].arTurnover, c[1].arTurnover, c[2].arTurnover],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">平均收現日數</td>
+            ${r([c[0].avgCollDays, c[1].avgCollDays, c[2].avgCollDays],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">存貨周轉率(次)</td>
+            ${r([c[0].invTurnover, c[1].invTurnover, c[2].invTurnover],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">平均銷貨日數（平均在庫天數）</td>
+            ${r([c[0].avgInvDays, c[1].avgInvDays, c[2].avgInvDays],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">不動產/廠房及設備周轉率(次)<br>= 固定資產周轉率</td>
+            ${r([c[0].ppeTurnover, c[1].ppeTurnover, c[2].ppeTurnover],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">總資產周轉率(次)</td>
+            ${r([c[0].taTurnover, c[1].taTurnover, c[2].taTurnover],1)}
+          </tr>
+          <!-- 獲利能力 -->
+          <tr>
+            <td class="category" rowspan="7">獲利<br>能力</td>
+            <td class="ratio-name">資產報酬率(%)　RoA = 總資產收益率</td>
+            ${r([c[0].roa, c[1].roa, c[2].roa])}
+          </tr>
+          <tr>
+            <td class="ratio-name">權益報酬率(%)　RoE = 淨資產收益率</td>
+            ${r([c[0].roe, c[1].roe, c[2].roe])}
+          </tr>
+          <tr>
+            <td class="ratio-name">稅前純益占實收資本比率(%)</td>
+            ${r([c[0].capRatio, c[1].capRatio, c[2].capRatio],1)}
+          </tr>
+          <tr>
+            <td class="ratio-name">營業毛利率(%)</td>
+            ${r([c[0].grossMargin, c[1].grossMargin, c[2].grossMargin])}
+          </tr>
+          <tr>
+            <td class="ratio-name">營業利益率(%)</td>
+            ${r([c[0].opMargin, c[1].opMargin, c[2].opMargin])}
+          </tr>
+          <tr>
+            <td class="ratio-name">純益率(%) = 淨利率</td>
+            ${r([c[0].netMargin, c[1].netMargin, c[2].netMargin])}
+          </tr>
+          <tr>
+            <td class="ratio-name">每股盈餘(元) = 每股收益</td>
+            ${r([c[0].eps, c[1].eps, c[2].eps], 2)}
+          </tr>
+          <!-- 現金流量 -->
+          <tr>
+            <td class="category" rowspan="3">現金<br>流量</td>
+            <td class="ratio-name">現金流量比率(%)</td>
+            ${r([c[0].cfRatio, c[1].cfRatio, c[2].cfRatio])}
+          </tr>
+          <tr>
+            <td class="ratio-name">現金流量允當比率(%)　<span style="color:#999;font-size:10px">（需5年資料）</span></td>
+            <td class="na">N/A</td><td class="na">N/A</td><td class="na">N/A</td>
+          </tr>
+          <tr>
+            <td class="ratio-name">現金再投資比率(%)　<span style="color:#999;font-size:10px">（需額外資料）</span></td>
+            <td class="na">N/A</td><td class="na">N/A</td><td class="na">N/A</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cash Flow Bottom -->
+  <div class="cf-section">
+    <table>
+      <thead><tr>
+        <th class="label-header">單位:百萬元</th>
+        ${years.map(y=>`<th>${y}</th>`).join('')}
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="row-label">營業活動現金流量（from 損益表）</td>
+          ${rCF([raw[1].ocf, raw[2].ocf, raw[3].ocf])}
+        </tr>
+        <tr>
+          <td class="row-label">投資活動現金流量（from 資產負債表左邊）</td>
+          ${rCF([raw[1].icf, raw[2].icf, raw[3].icf])}
+        </tr>
+        <tr>
+          <td class="row-label">籌資活動現金流量（from 資產負債表右邊）</td>
+          ${rCF([raw[1].fcf, raw[2].fcf, raw[3].fcf])}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>`;
+}
+</script>
+</body>
+</html>
