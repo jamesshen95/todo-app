@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-財務比率報表產生器 - 自動從 MOPS 抓取台股財報
+財務比率報表產生器 - 台股（MOPS）+ 國際股票（Yahoo Finance）
 
-安裝套件: pip install flask requests beautifulsoup4
+安裝套件: pip install flask requests beautifulsoup4 yfinance
 執行程式: python app.py
 開啟瀏覽器: http://localhost:5000
 """
@@ -179,7 +179,7 @@ def pct_of(part, total):
         return part / total * 100
     return None
 
-def build_report(company_num, company_name, years, ratios_list, bs_list, cf_list):
+def build_report(company_num, company_name, years, ratios_list, bs_list, cf_list, currency='百萬元'):
     def r(vals, dec=1):
         return ''.join(
             f'<td class="na">N/A</td>' if v is None else f'<td>{fmt(v, dec)}</td>'
@@ -216,9 +216,20 @@ def build_report(company_num, company_name, years, ratios_list, bs_list, cf_list
 
     has_ratios = any(any(v is not None for v in ro.values()) for ro in ratios_list)
 
+    is_intl = not bool(re.match(r'^\d{4,6}$', str(company_num)))
     notice = ''
     if not has_ratios:
-        notice = '''<div class="notice">
+        if is_intl:
+            notice = '''<div class="notice">
+          ⚠️ 無法從 Yahoo Finance 取得資料，可能原因：
+          <ul>
+            <li>股票代號輸入錯誤（美股請用英文代號，例如 GOOGL、AAPL）</li>
+            <li>Yahoo Finance 暫時無法連線</li>
+            <li>該年度財報尚未公告</li>
+          </ul>
+        </div>'''
+        else:
+            notice = '''<div class="notice">
           ⚠️ 無法從 MOPS 取得資料，可能原因：
           <ul>
             <li>股票代號輸入錯誤（請確認為上市公司）</li>
@@ -366,7 +377,7 @@ def build_report(company_num, company_name, years, ratios_list, bs_list, cf_list
   <div class="cf-section">
     <table>
       <thead><tr>
-        <th class="lbl-th">單位:百萬元</th>
+        <th class="lbl-th">單位:{currency}</th>
         {''.join(f'<th class="yr-col">{y}</th>' for y in years)}
       </tr></thead>
       <tbody>
@@ -507,8 +518,8 @@ INDEX_HTML = f'''<!DOCTYPE html>
 </html>'''
 
 
-def report_page(company_num, company_name, years, ratios_list, bs_list, cf_list):
-    card = build_report(company_num, company_name, years, ratios_list, bs_list, cf_list)
+def report_page(company_num, company_name, years, ratios_list, bs_list, cf_list, currency='百萬元'):
+    card = build_report(company_num, company_name, years, ratios_list, bs_list, cf_list, currency)
     return f'''<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -530,6 +541,152 @@ def report_page(company_num, company_name, years, ratios_list, bs_list, cf_list)
 </html>'''
 
 # ─────────────────────────────────────────────
+#  International Stocks (yfinance / Yahoo Finance)
+# ─────────────────────────────────────────────
+
+def is_taiwan_stock(stock_id):
+    """4–6 digit codes are Taiwan listed/OTC stocks."""
+    return bool(re.match(r'^\d{4,6}$', stock_id))
+
+def _yf_get(df, year, *keys):
+    """Return value in millions for the first matching key/year in a yfinance DataFrame."""
+    if df is None or df.empty:
+        return None
+    for col in df.columns:
+        col_year = col.year if hasattr(col, 'year') else int(str(col)[:4])
+        if col_year == year:
+            for k in keys:
+                if k in df.index:
+                    try:
+                        v = float(df.loc[k, col])
+                        if v == v:           # not NaN
+                            return v / 1_000_000
+                    except:
+                        pass
+    return None
+
+def _yf_get_eps(df, year):
+    """EPS is already per-share, no unit conversion."""
+    if df is None or df.empty:
+        return None
+    for col in df.columns:
+        col_year = col.year if hasattr(col, 'year') else int(str(col)[:4])
+        if col_year == year:
+            for k in ('Diluted EPS', 'Basic EPS', 'EPS'):
+                if k in df.index:
+                    try:
+                        v = float(df.loc[k, col])
+                        if v == v:
+                            return v
+                    except:
+                        pass
+    return None
+
+def _safe_pct(num, den):
+    return num / den * 100 if (num is not None and den and den != 0) else None
+
+def _safe_div(num, den):
+    return num / den if (num is not None and den and den != 0) else None
+
+def _avg(a, b):
+    if a is not None and b is not None:
+        return (a + b) / 2
+    return a if a is not None else b
+
+def fetch_international_data(ticker_symbol, ce_years):
+    import yfinance as yf
+    t = yf.Ticker(ticker_symbol.upper())
+
+    # Support both old (.financials) and new (.income_stmt) yfinance APIs
+    inc = getattr(t, 'income_stmt', None) or getattr(t, 'financials', None)
+    bal = getattr(t, 'balance_sheet', None)
+    cfs = getattr(t, 'cashflow', None)
+    info = t.info or {}
+
+    company_name = info.get('longName') or info.get('shortName') or ticker_symbol.upper()
+    currency = info.get('currency', 'USD')
+
+    ratios_list, bs_list, cf_list = [], [], []
+
+    for i, yr in enumerate(ce_years):
+        # ── Balance Sheet ──
+        ta   = _yf_get(bal, yr, 'Total Assets')
+        ca   = _yf_get(bal, yr, 'Current Assets')
+        cash = _yf_get(bal, yr, 'Cash And Cash Equivalents',
+                       'Cash Cash Equivalents And Short Term Investments',
+                       'Cash Financial')
+        ar   = _yf_get(bal, yr, 'Accounts Receivable', 'Net Receivables',
+                       'Receivables')
+        inv  = _yf_get(bal, yr, 'Inventory')
+        cl   = _yf_get(bal, yr, 'Current Liabilities',
+                       'Total Current Liabilities Net Minority Interest')
+        eq   = _yf_get(bal, yr, 'Stockholders Equity', 'Common Stock Equity',
+                       'Total Equity Gross Minority Interest')
+        ll   = _yf_get(bal, yr, 'Long Term Debt',
+                       'Total Non Current Liabilities Net Minority Interest',
+                       'Non Current Deferred Revenue Non Current')
+        ppe  = _yf_get(bal, yr, 'Net PPE', 'Property Plant Equipment Net')
+        ap   = _yf_get(bal, yr, 'Accounts Payable', 'Payables')
+
+        bs_list.append({'cash': cash, 'ar': ar, 'inventory': inv,
+                        'current_assets': ca, 'ppe': ppe, 'total_assets': ta,
+                        'ap': ap, 'current_liab': cl, 'lt_liab': ll, 'equity': eq})
+
+        # ── Income Statement ──
+        rev  = _yf_get(inc, yr, 'Total Revenue')
+        cogs = _yf_get(inc, yr, 'Cost Of Revenue')
+        gp   = _yf_get(inc, yr, 'Gross Profit')
+        oi   = _yf_get(inc, yr, 'Operating Income', 'Ebit')
+        ie   = _yf_get(inc, yr, 'Interest Expense')
+        pti  = _yf_get(inc, yr, 'Pretax Income')
+        ni   = _yf_get(inc, yr, 'Net Income')
+        eps  = _yf_get_eps(inc, yr)
+
+        cf_list.append({
+            'operating': _yf_get(cfs, yr, 'Operating Cash Flow',
+                                  'Cash Flows From Operations'),
+            'investing':  _yf_get(cfs, yr, 'Investing Cash Flow',
+                                  'Cash Flows From Investing'),
+            'financing':  _yf_get(cfs, yr, 'Financing Cash Flow',
+                                  'Cash Flows From Financing'),
+        })
+
+        # ── Calculate ratios using previous year averages ──
+        prev = bs_list[i - 1] if i > 0 else {}
+        avg_ta  = _avg(ta,  prev.get('total_assets'))
+        avg_ar  = _avg(ar,  prev.get('ar'))
+        avg_inv = _avg(inv, prev.get('inventory'))
+        avg_ppe = _avg(ppe, prev.get('ppe'))
+        avg_eq  = _avg(eq,  prev.get('equity'))
+
+        ie_abs = abs(ie) if ie is not None else 0
+        ratios_list.append({
+            'debt_ratio':     _safe_pct((ta or 0) - (eq or 0), ta),
+            'lt_cap_ratio':   _safe_pct((ll or 0) + (eq or 0), ppe),
+            'current_ratio':  _safe_pct(ca, cl),
+            'quick_ratio':    _safe_pct((ca or 0) - (inv or 0), cl),
+            'ar_turnover':    _safe_div(rev, avg_ar),
+            'avg_coll_days':  _safe_div(365, _safe_div(rev, avg_ar)),
+            'inv_turnover':   _safe_div(cogs, avg_inv),
+            'avg_inv_days':   _safe_div(365, _safe_div(cogs, avg_inv)),
+            'ppe_turnover':   _safe_div(rev, avg_ppe),
+            'ta_turnover':    _safe_div(rev, avg_ta),
+            'roa':            _safe_pct((ni or 0) + ie_abs * 0.75, avg_ta),
+            'roe':            _safe_pct(ni, avg_eq),
+            'pretax_capital': None,
+            'gross_margin':   _safe_pct(gp, rev),
+            'op_margin':      _safe_pct(oi, rev),
+            'net_margin':     _safe_pct(ni, rev),
+            'eps':            eps,
+            'cf_ratio':       _safe_pct(cf_list[-1]['operating'], cl),
+            'cf_adequacy':    None,
+            'cf_reinvest':    None,
+        })
+
+    return company_name, currency, ratios_list, bs_list, cf_list
+
+
+# ─────────────────────────────────────────────
 #  Flask Routes
 # ─────────────────────────────────────────────
 
@@ -539,7 +696,7 @@ def index():
 
 @app.route('/report', methods=['POST'])
 def report():
-    stock_id    = request.form.get('stock_id', '').strip()
+    stock_id     = request.form.get('stock_id', '').strip().upper()
     company_name = request.form.get('company_name', '').strip()
     years = [
         request.form.get('y1', '2023').strip(),
@@ -558,38 +715,46 @@ def report():
     if not stock_id:
         return INDEX_HTML
 
-    session = req.Session()
-    # Warm up session / get cookies
-    try:
-        session.get(
-            'https://mops.twse.com.tw/mops/web/index',
-            headers=BROWSER_HEADERS, timeout=10
-        )
-    except:
-        pass
+    currency = '百萬元'
 
-    ratios_list, bs_list, cf_list = [], [], []
-    for ce_year in ce_years:
+    if not is_taiwan_stock(stock_id):
+        # ── International path (yfinance) ──
         try:
-            ratios_list.append(fetch_ratios(session, stock_id, ce_year))
+            name, currency_code, ratios_list, bs_list, cf_list = \
+                fetch_international_data(stock_id, ce_years)
+            if not company_name:
+                company_name = name
+            currency = f'百萬 {currency_code}'
         except Exception as e:
-            ratios_list.append({})
+            ratios_list = [{} for _ in ce_years]
+            bs_list     = [{} for _ in ce_years]
+            cf_list     = [{} for _ in ce_years]
+    else:
+        # ── Taiwan path (MOPS) ──
+        session = req.Session()
         try:
-            bs_list.append(fetch_balance_sheet(session, stock_id, ce_year))
+            session.get('https://mops.twse.com.tw/mops/web/index',
+                        headers=BROWSER_HEADERS, timeout=10)
         except:
-            bs_list.append({})
-        try:
-            cf_list.append(fetch_cashflow(session, stock_id, ce_year))
-        except:
-            cf_list.append({})
+            pass
 
-    if not company_name:
-        company_name = fetch_company_name(session, stock_id)
+        ratios_list, bs_list, cf_list = [], [], []
+        for ce_year in ce_years:
+            try:    ratios_list.append(fetch_ratios(session, stock_id, ce_year))
+            except: ratios_list.append({})
+            try:    bs_list.append(fetch_balance_sheet(session, stock_id, ce_year))
+            except: bs_list.append({})
+            try:    cf_list.append(fetch_cashflow(session, stock_id, ce_year))
+            except: cf_list.append({})
+
+        if not company_name:
+            company_name = fetch_company_name(session, stock_id)
 
     html_out = report_page(
         stock_id, company_name,
         [str(y) for y in ce_years],
-        ratios_list, bs_list, cf_list
+        ratios_list, bs_list, cf_list,
+        currency
     )
     return Response(html_out, content_type='text/html; charset=utf-8')
 
