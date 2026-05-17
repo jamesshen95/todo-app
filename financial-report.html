@@ -373,22 +373,21 @@ function calcYear(raw, yi) {
   const avgField = (f) => hasPrev(f) ? avg(d[f], prev[f]) : d[f];
 
   // --- 會計項目 (占總資產%) ---
-  const ta = d.ta || 1;
+  const ta = d.ta;
   const bs = {
-    cash: pct(d.cash, ta),
-    ar: pct(d.ar, ta),
-    inv: pct(d.inv, ta),
-    ca: pct(d.ca, ta),
-    ap: pct(d.ap, ta),
-    cl: pct(d.cl, ta),
-    ll: pct(d.ll, ta),
-    eq: pct(d.eq, ta),
-    totalLiab: pct(ta - d.eq, ta),
+    cash: ta > 0 ? pct(d.cash, ta) : null,
+    ar:   ta > 0 ? pct(d.ar, ta) : null,
+    inv:  ta > 0 ? pct(d.inv, ta) : null,
+    ca:   ta > 0 ? pct(d.ca, ta) : null,
+    ap:   ta > 0 ? pct(d.ap, ta) : null,
+    cl:   ta > 0 ? pct(d.cl, ta) : null,
+    ll:   ta > 0 ? pct(d.ll, ta) : null,
+    eq:   ta > 0 ? pct(d.eq, ta) : null,
   };
 
   // --- 財務比率 ---
   // 財務結構
-  const debtRatio = pct(ta - d.eq, ta);
+  const debtRatio = ta > 0 ? pct(ta - d.eq, ta) : null;
   const longTermCapRatio = d.ppe > 0 ? pct(d.ll + d.eq, d.ppe) : null;
 
   // 償債能力
@@ -445,11 +444,12 @@ function buildReportCard(companyNum, companyName, years, raw) {
   function rCF(vals) {
     return vals.map(v => `<td style="text-align:right">${fmtCF(v)}</td>`).join('');
   }
-  function rBS(field) {
+  function rBS(field, bold) {
+    const cls = bold ? ' class="bold-row"' : '';
     return c.map(ci => {
       const val = ci.bs[field];
-      if (val === null || val === undefined || !isFinite(val)) return '<td>—</td>';
-      return `<td>${fmt(val,1)}</td>`;
+      if (val === null || val === undefined || !isFinite(val)) return `<td${cls} class="na">N/A</td>`;
+      return `<td${cls}>${fmt(val,1)}</td>`;
     }).join('');
   }
 
@@ -484,13 +484,13 @@ function buildReportCard(companyNum, companyName, years, raw) {
           <tr><td class="row-label">現金與約當現金 = 貨幣資金</td>${rBS('cash')}</tr>
           <tr><td class="row-label">應收帳款</td>${rBS('ar')}</tr>
           <tr><td class="row-label">存貨</td>${rBS('inv')}</tr>
-          <tr><td class="row-label bold-row">流動資產</td>${c.map(ci=>`<td class="bold-row">${fmt(ci.bs.ca,1)}</td>`).join('')}</tr>
-          <tr><td class="row-label bold-row">總資產</td>${c.map(_=>`<td class="bold-row">100</td>`).join('')}</tr>
+          <tr><td class="row-label bold-row">流動資產</td>${rBS('ca', true)}</tr>
+          <tr><td class="row-label bold-row">總資產</td>${c.map(ci=>`<td class="bold-row">${ci.bs.ca !== null ? '100' : 'N/A'}</td>`).join('')}</tr>
           <tr><td class="row-label">應付帳款</td>${rBS('ap')}</tr>
-          <tr><td class="row-label bold-row">流動負債</td>${c.map(ci=>`<td class="bold-row">${fmt(ci.bs.cl,1)}</td>`).join('')}</tr>
+          <tr><td class="row-label bold-row">流動負債</td>${rBS('cl', true)}</tr>
           <tr><td class="row-label">長期負債</td>${rBS('ll')}</tr>
-          <tr><td class="row-label bold-row">股東權益</td>${c.map(ci=>`<td class="bold-row">${fmt(ci.bs.eq,1)}</td>`).join('')}</tr>
-          <tr><td class="row-label bold-row">總負債+股東權益</td>${c.map(_=>`<td class="bold-row">100</td>`).join('')}</tr>
+          <tr><td class="row-label bold-row">股東權益</td>${rBS('eq', true)}</tr>
+          <tr><td class="row-label bold-row">總負債+股東權益</td>${c.map(ci=>`<td class="bold-row">${ci.bs.ca !== null ? '100' : 'N/A'}</td>`).join('')}</tr>
         </tbody>
       </table>
     </div>
