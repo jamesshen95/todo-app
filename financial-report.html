@@ -9,33 +9,47 @@
   body { font-family: 'Noto Sans TC', Arial, sans-serif; font-size: 13px; background: #f0f0f0; color: #222; }
 
   /* ── Input Page ── */
-  #input-page { max-width: 960px; margin: 20px auto; background: #fff; border-radius: 8px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
-  #input-page h1 { font-size: 20px; margin-bottom: 16px; color: #1a1a1a; }
-  .section-title { font-size: 14px; font-weight: bold; background: #333; color: #fff; padding: 6px 10px; margin: 18px 0 8px; border-radius: 4px; }
-  .info-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; align-items: center; }
-  .info-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-  .info-row input[type=text] { border: 1px solid #bbb; border-radius: 4px; padding: 4px 8px; width: 120px; font-size: 13px; }
+  #input-page { max-width: 960px; margin: 16px auto; background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  #input-page h1 { font-size: 20px; margin-bottom: 8px; color: #1a1a1a; }
+  .section-title { font-size: 14px; font-weight: bold; background: #333; color: #fff; padding: 8px 12px; margin: 18px 0 8px; border-radius: 4px; }
+  .info-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; align-items: center; }
+  .info-row label { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .info-row input[type=text] { border: 1px solid #bbb; border-radius: 6px; padding: 8px 10px; width: 130px; font-size: 15px; -webkit-appearance: none; }
   .info-row input[type=text].wide { width: 180px; }
 
-  table.input-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-  table.input-table th { background: #444; color: #fff; padding: 5px 8px; text-align: center; font-size: 12px; font-weight: bold; }
+  /* scrollable wrapper for tables on mobile */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table.input-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; min-width: 420px; }
+  table.input-table th { background: #444; color: #fff; padding: 8px 8px; text-align: center; font-size: 13px; font-weight: bold; white-space: nowrap; }
   table.input-table th.left { text-align: left; }
-  table.input-table td { padding: 4px 6px; border: 1px solid #ddd; vertical-align: middle; }
-  table.input-table td.label-cell { background: #f5f5f5; font-size: 12px; white-space: nowrap; }
-  table.input-table td.group-cell { background: #e8e8e8; font-weight: bold; font-size: 12px; }
-  table.input-table input[type=number] { width: 100%; border: none; background: transparent; text-align: right; font-size: 12px; padding: 2px 4px; outline: none; }
+  table.input-table td { padding: 2px 4px; border: 1px solid #ddd; vertical-align: middle; }
+  table.input-table td.label-cell { background: #f5f5f5; font-size: 12px; }
+  table.input-table td.group-cell { background: #e0e0e0; font-weight: bold; font-size: 12px; }
+  table.input-table input[type=number] { width: 100%; border: none; background: transparent; text-align: right; font-size: 15px; padding: 6px 4px; outline: none; min-width: 80px; -webkit-appearance: none; }
   table.input-table input[type=number]:focus { background: #fffbe6; border-radius: 2px; }
-  table.input-table tr:hover td { background: #fafff5; }
-  table.input-table td.label-cell:hover { background: #f5f5f5; }
 
-  .hint { font-size: 11px; color: #888; margin: 2px 0 8px; }
-  .btn-generate { display: block; width: 100%; padding: 12px; margin-top: 20px; background: #1a5c2a; color: #fff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; letter-spacing: 1px; }
-  .btn-generate:hover { background: #237a37; }
+  @media (max-width: 600px) {
+    #input-page { margin: 8px; padding: 12px; border-radius: 6px; }
+    #input-page h1 { font-size: 17px; }
+    .section-title { font-size: 13px; }
+    .info-row label { font-size: 13px; }
+    .info-row input[type=text] { font-size: 16px; padding: 8px; width: 110px; }
+    .info-row input[type=text].wide { width: 150px; }
+    table.input-table td.label-cell { font-size: 11px; min-width: 140px; }
+  }
+
+  .hint { font-size: 11px; color: #888; margin: 2px 0 8px; line-height: 1.5; }
+  .btn-generate { display: block; width: 100%; padding: 16px; margin-top: 20px; background: #1a5c2a; color: #fff; border: none; border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer; letter-spacing: 1px; -webkit-tap-highlight-color: transparent; }
+  .btn-generate:active { background: #134520; }
 
   /* ── Report Page ── */
-  #report-page { display: none; max-width: 1100px; margin: 20px auto; }
-  .btn-back { display: inline-block; margin: 0 0 12px 0; padding: 8px 18px; background: #555; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-  .btn-print { display: inline-block; margin: 0 0 12px 12px; padding: 8px 18px; background: #1a5c2a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  #report-page { display: none; max-width: 1100px; margin: 16px auto; padding: 0 8px; }
+  .report-actions { margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-back { padding: 10px 18px; background: #555; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  .btn-print { padding: 10px 18px; background: #1a5c2a; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; -webkit-tap-highlight-color: transparent; }
+  .report-scroll-hint { font-size: 11px; color: #888; margin-bottom: 6px; display: none; }
+  @media (max-width: 700px) { .report-scroll-hint { display: block; } }
+  .report-card-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
   .report-card { background: #fff; border: 2px solid #333; padding: 0; margin-bottom: 30px; }
 
@@ -109,8 +123,8 @@
 
   <!-- ── 損益表 ── -->
   <div class="section-title">損益表 Income Statement（單位：百萬元）</div>
-  <p class="hint">* 請直接填入「百萬元」為單位的數字，例如台積電營收 2,161,636 百萬元就填 2161636。</p>
-  <table class="input-table">
+  <p class="hint">* 請填入「百萬元」單位的數字，例如台積電營收 2,161,636 百萬元就填 2161636。</p>
+  <div class="table-scroll"><table class="input-table">
     <thead><tr>
       <th class="left" style="width:260px">項目</th>
       <th id="th-y1">2023</th><th id="th-y2">2024</th><th id="th-y3">2025</th>
@@ -149,12 +163,12 @@
         <td><input type="number" id="eps2" placeholder="0"></td>
         <td><input type="number" id="eps3" placeholder="0"></td></tr>
     </tbody>
-  </table>
+  </table></div>
 
   <!-- ── 資產負債表 ── -->
   <div class="section-title">資產負債表 Balance Sheet（單位：百萬元，為期末餘額）</div>
   <p class="hint">* 周轉率計算使用「前後兩年平均」；最早年度若無前期資料，將使用當年底餘額。</p>
-  <table class="input-table">
+  <div class="table-scroll"><table class="input-table">
     <thead><tr>
       <th class="left" style="width:260px">項目</th>
       <th>前期（Y0，選填）</th>
@@ -224,11 +238,11 @@
         <td><input type="number" id="eq2" placeholder="0"></td>
         <td><input type="number" id="eq3" placeholder="0"></td></tr>
     </tbody>
-  </table>
+  </table></div>
 
   <!-- ── 現金流量表 ── -->
   <div class="section-title">現金流量表 Cash Flow Statement（單位：百萬元）</div>
-  <table class="input-table">
+  <div class="table-scroll"><table class="input-table">
     <thead><tr>
       <th class="left" style="width:260px">項目</th>
       <th id="cf-th-y1">2023</th><th id="cf-th-y2">2024</th><th id="cf-th-y3">2025</th>
@@ -255,16 +269,21 @@
         <td><input type="number" id="div2" placeholder="0"></td>
         <td><input type="number" id="div3" placeholder="0"></td></tr>
     </tbody>
-  </table>
+  </table></div>
 
   <button class="btn-generate" onclick="generateReport()">生成財務比率報表 →</button>
 </div>
 
 <!-- ══════════════════ REPORT PAGE ══════════════════ -->
 <div id="report-page">
-  <button class="btn-back" onclick="showInput()">← 返回修改</button>
-  <button class="btn-print" onclick="window.print()">列印 / 儲存PDF</button>
-  <div id="report-container"></div>
+  <div class="report-actions">
+    <button class="btn-back" onclick="showInput()">← 返回修改</button>
+    <button class="btn-print" onclick="window.print()">列印 / 儲存PDF</button>
+  </div>
+  <p class="report-scroll-hint">← 左右滑動可查看完整報表 →</p>
+  <div class="report-card-wrap">
+    <div id="report-container"></div>
+  </div>
 </div>
 
 <script>
