@@ -759,10 +759,41 @@ def report():
     return Response(html_out, content_type='text/html; charset=utf-8')
 
 
+@app.route('/debug/<stock_id>')
+def debug(stock_id):
+    """診斷頁面：顯示 MOPS 回傳內容與解析結果"""
+    lines = [f'<h2>診斷：{stock_id}</h2><pre style="white-space:pre-wrap;font-size:12px">']
+    session = req.Session()
+    try:
+        session.get('https://mops.twse.com.tw/mops/web/index',
+                    headers=BROWSER_HEADERS, timeout=10)
+        lines.append('✅ MOPS 首頁連線成功\n')
+    except Exception as e:
+        lines.append(f'❌ MOPS 首頁連線失敗: {e}\n')
+
+    for ce_year in [2023, 2024, 2025]:
+        roc = ce_to_roc(ce_year)
+        lines.append(f'\n── {ce_year}年 (民國{roc}年) ──\n')
+        try:
+            raw = post_mops(session, 'ajax_t05st22', stock_id, roc)
+            rows = parse_table_rows(raw)
+            lines.append(f'  t05st22 回傳長度: {len(raw)} 字元，解析到 {len(rows)} 列\n')
+            for label, vals in rows[:8]:
+                lines.append(f'  {label[:30]:30s} | {vals[:3]}\n')
+            ratios = fetch_ratios(session, stock_id, ce_year)
+            lines.append(f'  解析結果: {ratios}\n')
+        except Exception as e:
+            lines.append(f'  ❌ 錯誤: {e}\n')
+
+    lines.append('</pre>')
+    return ''.join(lines)
+
+
 if __name__ == '__main__':
     print('=' * 50)
     print('  財務比率報表產生器')
     print('  開啟瀏覽器，前往: http://localhost:5000')
+    print('  診斷頁面: http://localhost:5000/debug/2330')
     print('  按 Ctrl+C 可停止程式')
     print('=' * 50)
     app.run(host='0.0.0.0', port=5000, debug=False)
